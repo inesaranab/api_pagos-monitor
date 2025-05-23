@@ -1,0 +1,5 @@
+curl.exe -X POST http://localhost:3000/simulate-down
+curl.exe -X POST http://localhost:3000/simulate-attack
+
+POST http://<tu_n8n_URL>/webhook/attack-alert
+Body: { "detail": "SQL injection detectado" }

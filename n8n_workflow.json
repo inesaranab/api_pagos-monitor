@@ -1,0 +1,248 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres un agente de resiliencia. Has sido activado por:\n- chatInput (puede venir vacío)\n- Por el cron periódico (chatInput vacío)\n- O un webhook de ataque (attackDetail).\n\nDispones de estas tools, las cuáles puedes utilizar únicamente una vez por activación:\n• get_status(): GET http://api_pagos:3000/status  \n• restart_service(): POST http://api_pagos:3000/restart  \n• send_email(subject, body)\n\nFlujo de decisión:\n1. Si recibiste attackDetail (no está vacío), eso es un intento de ataque:\n   a) Llama a get_status() y guarda la respuesta.  \n   b) Envía un correo con send_email(\n        subject: \"[URGENTE] Intento de ataque a API_PAGOS\",\n        body: \"Detalle del ataque: \" + attackDetail + \"\\nEstado actual: \" + statusResp.statusCode + \" – \" + statusResp.json.status + \"\\nTimestamp: \" + new Date().toISOString()\n      ).  \n   c) Responde en el chat:  \n      “🚨 He detectado un intento de ataque y he enviado la alerta al equipo de seguridad.”  \n   d) Termina.\n2. Si no hubo attackDetail, sigue tu flujo normal de chat/cron para caída:\n\nFlujo normal chat/cron para caída:\n1. Define report = true si chatInput contiene “error”, “caído” o “no funciona”; en caso contrario report = false.\n\n2. Ejecuta:\n   --- TOOL: get_status ---\n   METHOD: GET  \n   URL: http://api_pagos:3000/status  \n   --- END TOOL ---  \n   Guarda el resultado en `statusResp`. Si no consigues el statutusResp, considera el servidor caído con status ≠ \"OK\" \n\n3. Si statusResp.json.status ≠ \"OK\":\n   a) Ejecuta:\n      --- TOOL: restart_service ---\n      METHOD: POST  \n      URL: http://api_pagos:3000/restart  \n      --- END TOOL ---\n   b) Ejecuta:\n      --- TOOL: send_email ---\n      SUBJECT: \"[ALERTA] API_PAGOS reiniciado\"  \n      BODY:  \n      ```\n      Reporte: ${chatInput || \"–\"}  \n      Estado: ${statusResp.json.status}  \n      Reinicio: ${$now}\n      ```\n      --- END TOOL ---\n   c) Si report === true, responde en el chat:\n      > “He comunicado la incidencia. El servicio ha sido reiniciado y el equipo de operaciones ya ha sido notificado.”\n   d) Termina el flujo.\n\n4. Si statusResp.json.status === \"OK\" **y** report === true:\n   a) Ejecuta:\n      --- TOOL: send_email ---\n      SUBJECT: \"[INFO] API_PAGOS OK tras reporte\"  \n      BODY:  \n      ```\n      Reporte: ${chatInput}  \n      Estado: ${statusResp.json.status}  \n      Hora: ${$now}\n      ```\n      --- END TOOL ---\n   b) Responde en el chat:\n      > “Gracias por el aviso. He comprobado el estado y el servicio está funcionando correctamente.”\n   c) Termina el flujo.\n\n5. Si statusResp.json.status === \"OK\" **y** report === false:\n   - No uses ninguna tool ni respondas. Termina el flujo.\n\n \n  \n\n\n\n\n\n\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        660,
+        0
+      ],
+      "id": "9c7b5c42-3515-4fc2-97a7-99df3dfb186d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api_pagos:3000/restart\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        240
+      ],
+      "id": "64f7011f-64f4-45ab-b7e9-3aec953cf493",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        540,
+        240
+      ],
+      "id": "511ffe72-3d6b-4778-aaa8-b2b0740e99b9",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "0ZBHcfCFsKcKAL1Y",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "inesaranabach@gmail.com",
+        "subject": "Reinico de Servidor",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        920,
+        240
+      ],
+      "id": "7e1b0950-1773-435b-be73-e8dd0844a3ea",
+      "name": "Gmail",
+      "webhookId": "156fc1ad-904b-4c60-804f-298b60d1d4c3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FmLNwpt1nvcX8gCp",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://api_pagos:3000/status",
+        "options": {},
+        "optimizeResponse": true
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        220
+      ],
+      "id": "a91159d3-402e-4eae-aff7-96c5b10086aa",
+      "name": "HTTP Request1",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "¿Puedes indicarme el motivo de tu consulta más detalladamende?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        -180
+      ],
+      "id": "9ee50d8d-c839-46c1-ae45-acc1a6d7a1ef",
+      "name": "When chat message received",
+      "webhookId": "66a9e44f-dbc3-42d5-86d2-a64b2ac263b5"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        20
+      ],
+      "id": "8c4e0274-42d3-49ff-acf1-183d2e603567",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/attack-alert",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        -340
+      ],
+      "id": "2533cff5-53b1-4aad-839a-2a1d28f4160c",
+      "name": "Webhook",
+      "webhookId": "d34808cb-6d2c-4898-a1e2-7f5e1c791680"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e32db4e8-9b1c-467f-9027-0d0a2611e111",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e9630cedcae0a3ecb3552f0bf9c90d54bbf1fea789cde9ea5058cf7729ba7ead"
+  },
+  "id": "2lDYDhMjyQhUovAW",
+  "tags": []
+}
