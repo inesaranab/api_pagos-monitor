@@ -1,4 +1,4 @@
-# Entrega: Agente de Resiliencia Operativa
+# Agente de Resiliencia Operativa
 
 Este proyecto incluye:
 
